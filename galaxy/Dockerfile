@@ -126,7 +126,7 @@ EXPOSE :80
 EXPOSE :21
 
 # Mark folders as imported from the host.
-VOLUME ["/export/", "/data/"]
+VOLUME ["/export/", "/data/", "/galaxy-central/"]
 
 # Autostart script that is invoked during container start
 CMD ["/usr/bin/startup"]
