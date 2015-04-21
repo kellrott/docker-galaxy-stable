@@ -17,7 +17,7 @@ RUN apt-get -qq update && apt-get install --no-install-recommends -y apt-transpo
     apt-add-repository -y ppa:ansible/ansible && \
     apt-add-repository -y ppa:galaxyproject/nginx && \
     apt-get update -qq && apt-get upgrade -y && \
-    apt-get install --no-install-recommends -y mercurial python-psycopg2 postgresql-9.3 sudo samtools python-virtualenv wget \ 
+    apt-get install --no-install-recommends -y mercurial python-psycopg2 postgresql-9.3 sudo samtools python-virtualenv wget \
     nginx-extras uwsgi uwsgi-plugin-python supervisor lxc-docker-1.4.1 slurm-llnl slurm-llnl-torque libswitch-perl \
     slurm-drmaa-dev proftpd proftpd-mod-pgsql libyaml-dev nodejs-legacy npm aufs-tools ansible \
     nano nmap lynx vim curl python-pip && \
@@ -69,7 +69,7 @@ RUN ansible-playbook /tmp/ansible/provision.yml \
     --extra-vars galaxy_config_dir=$GALAXY_CONFIG_DIR \
     --extra-vars galaxy_job_conf_path=$GALAXY_CONFIG_JOB_CONFIG_FILE \
     --extra-vars galaxy_job_metrics_conf_path=$GALAXY_CONFIG_JOB_METRICS_CONFIG_FILE \
-    --tags=galaxyextras -c local && \
+    --tags=galaxyextras,pulsar -c local && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ADD roles/ /tmp/ansible/roles

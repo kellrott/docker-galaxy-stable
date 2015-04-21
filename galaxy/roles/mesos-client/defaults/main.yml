@@ -1,0 +1,4 @@
+---
+mesos_version: "0.21.0"
+ubuntu_version: 14.04
+local_easy_install: /usr/bin/easy_install

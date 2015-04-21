@@ -3,3 +3,18 @@
   roles:
       - role: galaxyprojectdotorg.galaxyextras
         tags: galaxyextras
+- hosts: localhost
+  connection: local
+  vars:
+    pulsar_server_dir: /pulsar
+    pulsar_venv_dir: /home/galaxy/venv/
+  roles:
+      - role: ansible-pulsar
+        tags: pulsar
+- hosts: localhost
+  connection: local
+  vars:
+    local_easy_install: /home/galaxy/venv/bin/easy_install
+  roles:
+      - role: mesos-client
+        tags: pulsar
