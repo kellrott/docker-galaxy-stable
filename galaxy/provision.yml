@@ -18,3 +18,8 @@
   roles:
       - role: mesos-client
         tags: pulsar
+- hosts: localhost
+  connection: local
+  roles:
+      - role: rabbitmq
+        tags: pulsar
