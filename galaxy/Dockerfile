@@ -11,7 +11,7 @@ MAINTAINER Björn A. Grüning, bjoern.gruening@gmail.com
 # * Enable the @natefoo magic
 # Web server infrastructure matching usegalaxy.org - supervisor, uwsgi, and nginx.
 
-ENV GALAXY_RELEASE=release_15.07 \
+ENV GALAXY_RELEASE=release_15.10 \
 GALAXY_REPO=https://github.com/galaxyproject/galaxy \
 GALAXY_ROOT=/galaxy-central \
 GALAXY_CONFIG_DIR=/etc/galaxy
@@ -39,11 +39,10 @@ RUN apt-get -qq update && apt-get install --no-install-recommends -y apt-transpo
     apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 36A1D7869245C8950F966E92D8576A8BA88D21E9 && \
     sh -c "echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list" && \
     apt-add-repository -y ppa:ansible/ansible && \
-    apt-add-repository -y ppa:galaxyproject/nginx && \
     apt-get update -qq && apt-get upgrade -y && \
     apt-get install --no-install-recommends -y mercurial python-psycopg2 postgresql-9.3 sudo samtools python-virtualenv wget \
-    nginx-extras nginx-common uwsgi uwsgi-plugin-python supervisor lxc-docker-1.7.1 slurm-llnl slurm-llnl-torque libswitch-perl \
-    slurm-drmaa-dev proftpd proftpd-mod-pgsql libyaml-dev nodejs-legacy npm aufs-tools ansible \
+    supervisor lxc-docker-1.7.1 slurm-llnl slurm-llnl-torque libswitch-perl \
+    slurm-drmaa-dev proftpd proftpd-mod-pgsql libyaml-dev ansible \
     nano nmap lynx vim curl python-pip && \
     apt-get purge -y software-properties-common && \
     apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -64,7 +63,6 @@ RUN mkdir -p $GALAXY_CONFIG_DIR $GALAXY_CONFIG_DIR/web && chown -R $GALAXY_USER:
 
 RUN su $GALAXY_USER -c "cp $GALAXY_ROOT/config/galaxy.ini.sample $GALAXY_CONFIG_FILE"
 ADD ./reports_wsgi.ini.sample $GALAXY_CONFIG_DIR/reports_wsgi.ini
-ADD ./htpasswd /etc/nginx/htpasswd
 ADD ./servers.ini $GALAXY_CONFIG_DIR/servers.ini
 RUN cat $GALAXY_CONFIG_DIR/servers.ini >> $GALAXY_CONFIG_FILE && rm $GALAXY_CONFIG_DIR/servers.ini
 ADD roles/ /tmp/ansible/roles
@@ -103,7 +101,7 @@ GALAXY_CONFIG_TOOL_DEPENDENCY_DIR=./tool_deps \
 GALAXY_CONFIG_ADMIN_USERS=admin@galaxy.org \
 GALAXY_CONFIG_MASTER_API_KEY=HSNiugRFvgT574F43jZ7N9F3 \
 GALAXY_CONFIG_BRAND="Galaxy Docker Build" \
-GALAXY_CONFIG_STATIC_ENABLED=False \
+GALAXY_CONFIG_STATIC_ENABLED=True \
 GALAXY_CONFIG_JOB_WORKING_DIRECTORY=/export/galaxy-central/database/job_working_directory \
 GALAXY_CONFIG_FILE_PATH=/export/galaxy-central/database/files \
 GALAXY_CONFIG_NEW_FILE_PATH=/export/galaxy-central/database/files \
@@ -126,15 +124,13 @@ GALAXY_CONFIG_GALAXY_INFRASTRUCTURE_URL=http://$HOST_IP/ \
 GALAXY_CONFIG_SANITIZE_ALL_HTML=False \
 GALAXY_CONFIG_TOOLFORM_UPGRADE=True \
 GALAXY_CONFIG_WELCOME_URL=$GALAXY_CONFIG_DIR/web/welcome.html \
-GALAXY_CONFIG_OVERRIDE_DEBUG=False
+GALAXY_CONFIG_OVERRIDE_DEBUG=False \
+GALAXY_CONFIG_ALLOW_LIBRARY_PATH_PASTE=True
 
 # Define the default postgresql database path
 ENV PG_DATA_DIR_DEFAULT=/var/lib/postgresql/9.3/main/ \
 PG_DATA_DIR_HOST=/export/postgresql/9.3/main/
 
-
-# Install all required Node dependencies. This is required to get proxy support to work for Interactive Environments
-RUN  cd /galaxy-central/lib/galaxy/web/proxy/js && npm install
 
 # Container Style
 ADD GalaxyDocker.png $GALAXY_CONFIG_DIR/web/welcome_image.png
@@ -151,9 +147,6 @@ RUN locale-gen en_US.UTF-8 && dpkg-reconfigure locales
 # Include all needed scripts from the host
 ADD ./setup_postgresql.py /usr/local/bin/setup_postgresql.py
 ADD ./export_user_files.py /usr/local/bin/export_user_files.py
-
-# workaround for a Docker AUFS bug: https://github.com/docker/docker/issues/783#issuecomment-56013588
-#RUN mkdir /etc/ssl/private-copy; mv /etc/ssl/private/* /etc/ssl/private-copy/; rm -r /etc/ssl/private; mv /etc/ssl/private-copy /etc/ssl/private; chmod -R 0700 /etc/ssl/private; chown -R postgres /etc/ssl/private
 
 # Configure PostgreSQL
 # 1. Remove all old configuration
@@ -173,30 +166,24 @@ ADD ./tool_sheds_conf.xml $GALAXY_HOME/tool_sheds_conf.xml
 # Activate arbritrary Tool Sheds during build-time by manipulating the original tool_sheds_conf.xml file
 ADD ./add_tool_shed.py /usr/bin/add-tool-shed
 
-ADD ./startup.sh /usr/bin/startup
+ADD ./startup.sh /usr/bin/galaxy_startup
+ADD ./shutdown.sh /usr/bin/galaxy_shutdown
 # script that enables easier downstream installation of tools (e.g. for different Galaxy Docker flavours)
-ADD install_repo_wrapper.sh /usr/bin/install-repository
-# script to install BioJS visualizations
-ADD install_biojs_vis.sh /usr/bin/install-biojs
-RUN chmod +x /usr/bin/install-repository /usr/bin/startup /usr/bin/install-biojs /usr/bin/add-tool-shed
+
+RUN chmod +x /usr/bin/galaxy_startup /usr/bin/galaxy_shutdown
 
 # This needs to happen here and not above, otherwise the Galaxy start
 # (without running the startup.sh script) will crash because integrated_tool_panel.xml could not be found.
 ENV GALAXY_CONFIG_INTEGRATED_TOOL_PANEL_CONFIG /export/galaxy-central/integrated_tool_panel.xml
 
-ADD ./cgroupfs_mount.sh /root/cgroupfs_mount.sh
-
 # Expose port 80 (webserver), 21 (FTP server), 8800 (Proxy), 9002 (supvisord web app)
-EXPOSE :80
-EXPOSE :21
-EXPOSE :8800
-EXPOSE :9002
+EXPOSE :8080
 
 # We need to set $HOME for some Tool Shed tools (e.g Perl libs with $HOME/.cpan)
 ENV HOME $GALAXY_HOME
 ENV PYTHONPATH /galaxy-central/lib/
 # Mark folders as imported from the host.
-VOLUME ["/export/", "/data/", "/var/lib/docker"]
+VOLUME ["/export/", "/data/"]
 
 # Autostart script that is invoked during container start
 CMD ["/usr/bin/startup"]

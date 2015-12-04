@@ -1,5 +1,8 @@
 - hosts: localhost
   connection: local
+  vars: 
+    galaxy_extras_config_nginx: false
+    galaxy_extras_config_slurm: false
   roles:
       - role: galaxyprojectdotorg.galaxyextras
         tags: galaxyextras
